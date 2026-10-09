@@ -1,29 +1,34 @@
 import asyncio
 import logging
+import os
 from aiogram import Bot, Dispatcher
-from aiogram.client.telegram import TelegramAPIServer
 from aiogram.client.session.aiohttp import AiohttpSession
-from config import BOT_TOKEN
 from handlers import router
 import database as db
+
+# 1. Проверяем токен везде: и в секретах сервера, и в локальном файле config.py
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if not BOT_TOKEN:
+    try:
+        from config import BOT_TOKEN
+    except ImportError:
+        BOT_TOKEN = None
 
 logging.basicConfig(level=logging.INFO)
 
 async def main():
-    # 1. Инициализируем базу данных
+    # 2. Инициализируем базу данных
     db.init_db()
     print("База данных успешно запущена и проверена!")
     
-    # 2. Настраиваем официальное и стабильное зеркало Telegram
-    custom_server = TelegramAPIServer(
-        base="https://telegram-proxy.org{token}/{method}",
-        file="https://telegram-proxy.org{token}/{path}"
-    )
+    # 3. Настраиваем чистую сессию: в облаке Amvera интернет прямой, на ПК — прокси
+    if os.getenv("BOT_TOKEN"):  # Если запущено в облаке Amvera
+        session = AiohttpSession()
+    else:  # Если запускаем локально на вашем ПК
+        session = AiohttpSession(proxy="socks5://127.0.0.1:10808")
     
-    # 3. Создаем чистую сессию для облака без жестких локальных портов компьютера
-    session = AiohttpSession(api_server=custom_server)
-    
-    # 4. Запускаем бота
+    # 4. Инициализируем бота
     bot = Bot(token=BOT_TOKEN, session=session)
     dp = Dispatcher()
     
