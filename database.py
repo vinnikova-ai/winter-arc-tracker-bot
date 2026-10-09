@@ -1,8 +1,7 @@
 import sqlite3
 from datetime import datetime
 
-# Жестко прописываем путь для облака, чтобы Amvera не ругалась и сохраняла цели навсегда
-DB_NAME = "/data/database.db"
+DB_NAME = "database.db"
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -74,17 +73,23 @@ def get_goal_stats(goal_id: int):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM logs WHERE goal_id = ? AND status = 1", (goal_id,))
-    count = cursor.fetchone()[0] # Исправлено: сразу достаем число из кортежа
+    count = cursor.fetchone()[0]
     conn.close()
     return count
 
 def get_goal_percentage(goal_id: int):
+    """Считает процент выполнения цели относительно прошедших дней Winter Arc"""
     start_date = datetime(2026, 10, 5)
     now = datetime.now()
+    
+    # Считаем, сколько дней марафона уже прошло
     passed_days = (now - start_date).days + 1
     if passed_days <= 0:
         passed_days = 1
+        
     completed_days = get_goal_stats(goal_id)
+    
+    # Вычисляем процент
     percentage = int((completed_days / passed_days) * 100)
     return percentage, completed_days
 
@@ -97,6 +102,7 @@ def delete_goal_from_db(goal_id: int):
     conn.close()
 
 def get_all_users():
+    """Возвращает список всех ID пользователей для рассылки напоминаний"""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT user_id FROM users")
