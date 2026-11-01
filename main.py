@@ -38,7 +38,7 @@ async def start_web_server():
 
 async def main():
     # Запускаем БД
-    await db.init_db()
+    db.init_db()
     
     # Запускаем веб-сервер для прохождения проверки Render
     asyncio.create_task(start_web_server())
