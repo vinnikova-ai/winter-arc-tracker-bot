@@ -3,12 +3,18 @@ import logging
  
 from aiogram import Bot, Dispatcher
  
-from config import BOT_TOKEN
+import os
+import logging
 from handlers import router
 import database as db
- 
+from dotenv import load_dotenv
+
+# Загружаем переменные окружения
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
 logging.basicConfig(level=logging.INFO)
- 
+
  
 async def main():
     # 1. Инициализируем базу данных
