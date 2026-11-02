@@ -1,44 +1,51 @@
 import os
-from aiogram import Router, F
-from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+import logging
+import asyncio
+from aiogram import Bot, Dispatcher
+from handlers import router
 import database as db
+from dotenv import load_dotenv
+from aiohttp import web
 
-router = Router()
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
 
-def get_main_keyboard():
-    # Создаем клавиатуру с вашей новой ссылкой на Cloudflare Pages
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="🚀 Открыть трекер",
-                web_app=WebAppInfo(url="https://vinnikova-arc-bot.pages.dev/")
-            )
-        ]
-    ])
-    return keyboard
+# Загружаем переменные окружения
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-@router.message(CommandStart())
-async def cmd_start(message: Message):
-    # Регистрируем пользователя в базе данных, если его там нет
-    db.add_user(
-        user_id=message.from_user.id,
-        username=message.from_user.username,
-        first_name=message.from_user.first_name
-    )
+# Инициализация бота и диспетчера
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+dp.include_router(router)
+
+# Простейший хэндлер для порта Render
+async def handle_ping(request):
+    return web.Response(text="Bot is running!")
+
+# Фоновая задача для запуска веб-сервера
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', handle_ping)
+    runner = web.AppRunner(app)
+    await runner.setup()
     
-    await message.answer(
-        f"Привет, {message.from_user.first_name}! 👋\n\n"
-        f"Добро пожаловать в твой личный трекер привычек «Мой ритм».\n"
-        f"Нажимай кнопку ниже, чтобы отмечать выполнение и следить за прогрессом!",
-        reply_markup=get_main_keyboard()
-    )
+    # Читаем порт, который требует Render (по умолчанию 10000)
+    port = int(os.getenv("PORT", 10000))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logging.info(f"Web server started on port {port}")
 
-@router.message(Command("help"))
-async def cmd_help(message: Message):
-    await message.answer(
-        "📝 **Справка по боту:**\n\n"
-        "• Нажми кнопку под сообщением, чтобы открыть визуальный трекер.\n"
-        "• Все привычки, уровни и очки опыта (XP) сохраняются автоматически.\n"
-        "• Раз в неделю ты можешь составить ИИ-обзор своих успехов прямо в приложении!"
-    )
+async def main():
+    # Запускаем БД
+    db.init_db()
+    
+    # Запускаем веб-сервер для прохождения проверки Render
+    asyncio.create_task(start_web_server())
+    
+    # Запускаем сам процесс получения обновлений Telegram
+    logging.info("Starting bot long polling...")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
